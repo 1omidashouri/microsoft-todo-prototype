@@ -215,7 +215,7 @@ Port: 5432
 username: postgres
 password: postgres
 
-right click and create database: microsoft_todo_db
+-right click and create database: microsoft_todo_db
 
 -install next-auth:
 https://next-auth.js.org/getting-started/example#install-nextauth
