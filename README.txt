@@ -207,6 +207,15 @@ services:
 #sudo chmod -R u+rwX ./pgadmin
 #docker compose run -d
 
+-create database:
+http://localhost:5433/browser/
+create a connection:
+Host name/address: postgre-server-postgres-1
+Port: 5432
+username: postgres
+password: postgres
+
+right click and create database: microsoft_todo_db
 
 -install next-auth:
 https://next-auth.js.org/getting-started/example#install-nextauth
