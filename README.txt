@@ -226,115 +226,122 @@ Port: 5432
 username: postgres
 password: postgres
 
--right click and create database: microsoft_todo_db
+-right click and create database: m_todo_db
 
 -install next-auth:
 https://next-auth.js.org/getting-started/example#install-nextauth
-#npm install next-auth
-
 https://authjs.dev/getting-started/adapters/drizzle
-#npm install drizzle-orm @auth/drizzle-adapter
-#npm install dotenv --save
-#npm install drizzle-kit --save-dev
+#npm i drizzle-orm pg next-auth@beta @auth/drizzle-adapter dotenv
+#npm i -D drizzle-kit @types/pg
 
  -Environment Variables:
 AUTH_DRIZZLE_URL=postgres://postgres:postgres@127.0.0.1:5432/db
 
-https://orm.drizzle.team/docs/kit-overview
-#npm i -D drizzle-kit (same as npm install drizzle-kit --save-dev)
--drizzle.config.ts in root project:
-import { defineConfig } from "drizzle-kit";
-
-export default defineConfig({
-  out: "./drizzle",
-  dialect: "postgresql",
-  schema: "./schema.ts",
-
-  entities: {
-    roles: {
-      exclude: ["admin"],
-      include: ["user"],
-      provider: "supabase",
-    },
-  },
-
-  driver: "pglite",
-  dbCredentials: {
-    url: "./database/",
-  },
-
-  extensionsFilters: ["postgis"],
-  schemaFilter: "public",
-  tablesFilter: "*",
-
-  introspect: {
-    casing: "camel",
-  },
-
-  migrations: {
-    table: "__drizzle_migrations__",
-    schema: "public",
-  },
-
-  breakpoints: true,
-  verbose: true,
-});
-
-
--install drizzle orm:
- https://orm.drizzle.team/docs/get-started
-
- -This guide assumes familiarity with:
- https://www.npmjs.com/package/dotenv
- #npm install dotenv --save
-
- https://tsx.hirok.io/
-
- https://node-postgres.com/
- #npm install pg
-
+#npx auth secret
+AUTH_SECRET="your-auth-secret"
 
 https://orm.drizzle.team/docs/get-started/postgresql-new
- -Step 1 - Install node-postgres package:
- #npm i drizzle-orm@rc pg dotenv
- #npm i -D drizzle-kit@rc tsx @types/pg
- -Step 2 - Setup connection variables:
- Create a .env file in the root of your project and add your database connection variable.
- DATABASE_URL=
- -Step 3 - Connect Drizzle ORM to the database:
- -Create a index.ts file in the src directory and initialize the connection.
-import 'dotenv/config';
+-create microsoft-todo-prototype\db\index.ts:
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import * as schema from "./schema";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
 });
-  const db = drizzle({ client: pool });
- -Step 4 - Create a table:
- -Create a schema.ts file in the src/db directory and declare your table.(src/db/schema.ts)
-import { integer, pgTable, varchar } from "drizzle-orm/pg-core";
-export const usersTable = pgTable("users", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  name: varchar({ length: 255 }).notNull(),
-  age: integer().notNull(),
-  email: varchar({ length: 255 }).notNull().unique(),
+
+export const db = drizzle({ client: pool, schema });
+
+
+-create microsoft-todo-prototype\db\schema.ts:
+import {
+  boolean,
+  timestamp,
+  pgTable,
+  text,
+  primaryKey,
+  integer,
+} from "drizzle-orm/pg-core";
+import type { AdapterAccountType } from "next-auth/adapters";
+
+export const users = pgTable("user", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name"),
+  email: text("email").unique(),
+  emailVerified: timestamp("emailVerified", { mode: "date" }),
+  image: text("image"),
 });
- -Step 5 - Setup Drizzle config file:
- -Create a drizzle.config.ts file in the root of your project and add the following content:
-import 'dotenv/config';
-import { defineConfig } from 'drizzle-kit';
+
+export const accounts = pgTable(
+  "account",
+  {
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").$type<AdapterAccountType>().notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("providerAccountId").notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: text("token_type"),
+    scope: text("scope"),
+    id_token: text("id_token"),
+    session_state: text("session_state"),
+  },
+  (account) => [
+    primaryKey({
+      columns: [account.provider, account.providerAccountId],
+    }),
+  ]
+);
+
+export const sessions = pgTable("session", {
+  sessionToken: text("sessionToken").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+});
+
+export const verificationTokens = pgTable(
+  "verificationToken",
+  {
+    identifier: text("identifier").notNull(),
+    token: text("token").notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (verificationToken) => [
+    primaryKey({
+      columns: [verificationToken.identifier, verificationToken.token],
+    }),
+  ]
+);
+
+
+-create microsoft-todo-prototype\drizzle.config.ts:
+import "dotenv/config";
+import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
-  out: './drizzle',
-  schema: './src/db/schema.ts',
-  dialect: 'postgresql',
+  out: "./drizzle",
+  schema: "./db/schema.ts",
+  dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL!,
   },
 });
- -Step 6 - Applying changes to the database:
- #npx drizzle-kit push
+
+
+-push the tables into postgresql:
+#npx drizzle-kit generate
+#npx drizzle-kit migrate
+
+#npx drizzle-kit studio
+https://local.drizzle.studio/
+
 
 
 https://www.npmjs.com/package/bcrypt
