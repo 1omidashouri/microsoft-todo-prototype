@@ -17,6 +17,17 @@ microsoft-todo-prototype
 #nvm install --lts
 #node -v
 
+-for windows:(in powershell)
+#winget install CoreyButler.NVMforWindows
+-close and reopen powershell
+#nvm version
+#nvm install lts
+#nvm use lts
+-remove the standalone installation in windows:
+#winget uninstall OpenJS.NodeJS.LTS
+#winget uninstall OpenJS.NodeJS
+#Remove-Item "C:\Program Files\nodejs" -Recurse -Force -ErrorAction SilentlyContinue
+
 -edit microsoft-todo-prototype/app/globals.css:
 @import "tailwindcss";
 
