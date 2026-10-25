@@ -346,3 +346,297 @@ https://local.drizzle.studio/
 
 https://www.npmjs.com/package/bcrypt
 #npm install bcrypt
+
+
+
+-
+2.authentication
+2.1.authentication lecture
+-photos
+
+-
+2.2.authentication lab:
+
+https://authjs.dev/getting-started/adapters/drizzle
+
+-create microsoft-todo-prototype/db/auth.ts:
+import NextAuth from "next-auth";
+import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import { db } from "./index";
+import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcrypt";
+import { users } from "./schema";
+import { eq } from "drizzle-orm";
+
+function passwordToSalt(password: string) {
+  const saltRounds = 10;
+  const hash = bcrypt.hashSync(password, saltRounds);
+  return hash;
+}
+
+async function getUserFromDb(username: string) {
+  const user = await db.query.users.findFirst({
+    where: eq(users.name, username),
+  });
+  return user;
+}
+
+async function addUserToDb(username: string, saltedPassword: string) {
+  const user = await db
+    .insert(users)
+    .values({
+      id: crypto.randomUUID(),
+      name: username,
+      password: saltedPassword,
+    })
+    .returning();
+  return user.pop();
+}
+
+export const {
+  handlers: { GET, POST },
+  auth,
+  signIn,
+  signOut,
+} = NextAuth({
+  adapter: DrizzleAdapter(db),
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        username: {
+          label: "Username",
+          type: "text",
+          placeholder: "myusername",
+        },
+        password: { label: "Password", type: "text" },
+      },
+      async authorize(credentials, request) {
+        let user = null;
+        const username = credentials.username as string;
+        const password = credentials.password as string;
+        if (!username || !password) {
+          return null;
+        }
+
+        user = await getUserFromDb(username);
+        if (user) {
+          if (!user.password) {
+            return null;
+          }
+          const isAuthenticated = await bcrypt.compare(password, user.password);
+          if (isAuthenticated) {
+            return user;
+          } else {
+            return null;
+          }
+        }
+
+        if (!user) {
+          const saltPassword = passwordToSalt(password);
+          user = await addUserToDb(username, saltPassword);
+        }
+
+        if (!user) {
+          throw new Error("user not found and could not be created.");
+        }
+
+        return user;
+      },
+    }),
+  ],
+  callbacks:{
+    async session({session,user,token}){
+      return session;
+    }
+  },
+  session:{
+    strategy:"jwt"
+  }
+});
+
+
+-create microsoft-todo-prototype/app/api/auth/[...nextauth]/route.ts:
+import { GET, POST } from "@/db/auth";
+
+export { GET, POST };
+
+
+-create microsoft-todo-prototype/types/next-auth.d.ts:
+import NextAuth from "next-auth";
+
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      name: string;
+    };
+  }
+}
+
+
+-create microsoft-todo-prototype/components/signin-btn.tsx:
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { signIn } from "next-auth/react";
+
+export default function SignInBtn() {
+  return <Button onClick={() => signIn()}>Sign in</Button>;
+}
+
+
+-create microsoft-todo-prototype/components/session-provider.tsx:
+"use client";
+
+import { SessionProvider } from "next-auth/react";
+export default SessionProvider;
+
+
+-create microsoft-todo-prototype/app/(private)/layout.tsx:
+import SessionProvider from "@/components/session-provider";
+import { auth } from "@/db/auth";
+import { connection } from "next/server";
+import { ReactNode, Suspense } from "react";
+
+async function AuthenticatedShell({ children }: { children: ReactNode }) {
+  await connection();
+  const session = await auth();
+
+  return (
+    <SessionProvider session={session}>
+      <div>{children}</div>
+    </SessionProvider>
+  );
+}
+
+export default function Layout({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={null}>
+      <AuthenticatedShell>{children}</AuthenticatedShell>
+    </Suspense>
+  );
+}
+
+
+-edit microsoft-todo-prototype/app/page.tsx:
+import { ModeToggle } from "@/components/mode-toggle";
+import SignInBtn from "@/components/signin-btn";
+import { auth } from "@/db/auth";
+import { ArrowRightIcon } from "lucide-react";
+import { connection } from "next/server";
+import { Suspense } from "react";
+
+async function AuthSection() {
+  await connection();
+  const session = await auth();
+
+  if (session) {
+    return (
+      <>
+        home page <ArrowRightIcon className="ml-2" /> <br />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <SignInBtn /> <br />
+    </>
+  );
+}
+
+export default function Home() {
+  return (
+    <div className="flex h-screen w-screen justify-center items-center">
+      <div className="flex flex-col gap-5 text-center">
+        <ModeToggle /> <br />
+        <h1>Microsoft to do prototype</h1>
+        <div>
+          <Suspense fallback={null}>
+            <AuthSection />
+          </Suspense>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+-edit microsoft-todo-prototype/db/schema.ts:
+import {
+  boolean,
+  timestamp,
+  pgTable,
+  text,
+  primaryKey,
+  integer,
+} from "drizzle-orm/pg-core";
+import type { AdapterAccountType } from "next-auth/adapters";
+
+export const users = pgTable("user", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name"),
+  email: text("email").unique(),
+  emailVerified: timestamp("emailVerified", { mode: "date" }),
+  image: text("image"),
+  password: text("password")
+});
+
+export const accounts = pgTable(
+  "account",
+  {
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").$type<AdapterAccountType>().notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("providerAccountId").notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: text("token_type"),
+    scope: text("scope"),
+    id_token: text("id_token"),
+    session_state: text("session_state"),
+  },
+  (account) => [
+    primaryKey({
+      columns: [account.provider, account.providerAccountId],
+    }),
+  ]
+);
+
+export const sessions = pgTable("session", {
+  sessionToken: text("sessionToken").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+});
+
+export const verificationTokens = pgTable(
+  "verificationToken",
+  {
+    identifier: text("identifier").notNull(),
+    token: text("token").notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (verificationToken) => [
+    primaryKey({
+      columns: [verificationToken.identifier, verificationToken.token],
+    }),
+  ]
+);
+
+
+#npx drizzle-kit generate
+#npx drizzle-kit migrate
+
+
+
+-
+3.responsive app shell:
+3.1.responseve app shell lecture

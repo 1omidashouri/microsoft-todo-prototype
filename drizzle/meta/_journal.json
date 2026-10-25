@@ -8,6 +8,13 @@
       "when": 1792867383550,
       "tag": "0000_tiny_jackal",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792921261667,
+      "tag": "0001_futuristic_thunderball",
+      "breakpoints": true
     }
   ]
 }
