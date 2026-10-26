@@ -640,3 +640,210 @@ export const verificationTokens = pgTable(
 -
 3.responsive app shell:
 3.1.responseve app shell lecture
+-photos
+
+-
+3.2.responsive app shell lab:
+
+-create microsoft-todo-prototype/app/(private)/tasks/page.tsx:
+import React from 'react'
+
+export default function TaskPage() {
+  return (
+    <div>TaskPage</div>
+  )
+}
+
+
+-create microsoft-todo-prototype/app/loading.tsx:
+
+export default function LoadingPage() {
+  return <div>the component is loading....</div>;
+}
+
+
+-edit microsoft-todo-prototype/app/page.tsx:
+import { ModeToggle } from "@/components/mode-toggle";
+import SignInBtn from "@/components/signin-btn";
+import { Button } from "@/components/ui/button";
+import { auth } from "@/db/auth";
+
+import { ArrowRightIcon } from "lucide-react";
+import Link from "next/link";
+import { connection } from "next/server";
+
+import { Suspense } from "react";
+import LoadingPage from "./loading";
+
+async function AuthSection() {
+  await connection();
+  const session = await auth();
+
+  if (session) {
+    return (
+      <Link href="/tasks">
+        <Button>
+          go to task page <ArrowRightIcon className="ml-2" />
+        </Button>
+      </Link>
+    );
+  }
+
+  return (
+    <>
+      <SignInBtn /> <br />
+    </>
+  );
+}
+
+export default function Home() {
+  return (
+    <div className="flex h-screen w-screen justify-center items-center">
+      <div className="flex flex-col gap-5 text-center">
+        <ModeToggle /> <br />
+        <h1>Microsoft to do prototype</h1>
+        <div>
+          <Suspense fallback={<LoadingPage/>}>
+            <AuthSection />
+          </Suspense>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+-create microsoft-todo-prototype/components/app-shell.tsx:
+import React, { ReactNode } from "react";
+import Header from "./header";
+
+export default function AppShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-12">
+      <div className="sm:col-span-12"><Header/></div>
+      <div className="sm:col-span-3 ">sidebar</div>
+      <div className="sm:col-span-9 ">{children}</div>
+    </div>
+  );
+}
+
+
+
+-edit microsoft-todo-prototype/app/(private)/layout.tsx:
+import SessionProvider from "@/components/session-provider";
+import { auth } from "@/db/auth";
+import { redirect } from "next/navigation";
+import { connection } from "next/server";
+import { ReactNode, Suspense } from "react";
+import LoadingPage from "../loading";
+import AppShell from "@/components/app-shell";
+
+async function AuthenticatedShell({ children }: { children: ReactNode }) {
+  await connection();
+  const session = await auth();
+
+  if (!session) {
+    redirect("/");
+  }
+
+  return (
+    <SessionProvider session={session}>
+      <AppShell>{children}</AppShell>
+    </SessionProvider>
+  );
+}
+
+export default function Layout({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<LoadingPage />}>
+      <AuthenticatedShell>{children}</AuthenticatedShell>
+    </Suspense>
+  );
+}
+
+
+
+-create microsoft-todo-prototype/components/avatar-menu.tsx:
+"use client";
+
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LogOut, UserRound } from "lucide-react";
+import { signOut } from "next-auth/react";
+
+export default function AvatarMenu() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger>
+        <UserRound className="w-6 h-6" aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
+            <Button variant="ghost">
+              <LogOut className="size-5" /> Sign out
+            </Button>
+          </DropdownMenuItem>
+          <DropdownMenuItem>Subscription</DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+
+
+-create microsoft-todo-prototype/components/header.tsx:
+import { Check } from "lucide-react";
+import Link from "next/link";
+import React from "react";
+import { ModeToggle } from "./mode-toggle";
+import AvatarMenu from "./avatar-menu";
+
+export default function Header() {
+  return (
+    <div className="flex justify-between p-5 border-b-2">
+      <Link href="/">
+        <Check className="h-8 w-8" />
+      </Link>
+      <div className="flex gap-5">
+        <ModeToggle />
+        <AvatarMenu />
+      </div>
+    </div>
+  );
+}
+
+
+-edit microsoft-todo-prototype/components/signin-btn.tsx:
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { signIn } from "next-auth/react";
+
+export default function SignInBtn() {
+  return (
+    <Button onClick={() => signIn(undefined, { callbackUrl: "/tasks" })}>
+      Sign in
+    </Button>
+  );
+}
+
+
+-create microsoft-todo-prototype/app/(private)/important/page.tsx:
+
+
+-1738

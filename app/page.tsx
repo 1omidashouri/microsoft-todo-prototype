@@ -1,9 +1,14 @@
 import { ModeToggle } from "@/components/mode-toggle";
 import SignInBtn from "@/components/signin-btn";
+import { Button } from "@/components/ui/button";
 import { auth } from "@/db/auth";
+
 import { ArrowRightIcon } from "lucide-react";
+import Link from "next/link";
 import { connection } from "next/server";
+
 import { Suspense } from "react";
+import LoadingPage from "./loading";
 
 async function AuthSection() {
   await connection();
@@ -11,9 +16,11 @@ async function AuthSection() {
 
   if (session) {
     return (
-      <>
-        home page <ArrowRightIcon className="ml-2" /> <br />
-      </>
+      <Link href="/tasks">
+        <Button>
+          go to task page <ArrowRightIcon className="ml-2" />
+        </Button>
+      </Link>
     );
   }
 
@@ -31,7 +38,7 @@ export default function Home() {
         <ModeToggle /> <br />
         <h1>Microsoft to do prototype</h1>
         <div>
-          <Suspense fallback={null}>
+          <Suspense fallback={<LoadingPage/>}>
             <AuthSection />
           </Suspense>
         </div>
